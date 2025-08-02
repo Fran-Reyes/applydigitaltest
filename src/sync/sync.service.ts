@@ -1,21 +1,25 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import axios, { AxiosError } from 'axios';
+import axios, { AxiosError, AxiosInstance } from 'axios';
 import { ConfigService } from '@nestjs/config';
 import { ProductsService } from '../products/products.service';
 
 type Entry = { fields?: Record<string, unknown>; sys?: { id?: string } };
 type CdaList<T> = { total: number; skip: number; limit: number; items: T[] };
 
+const MAX_RETRIES = 5;
+const JITTER_MS = 250;
+
 @Injectable()
 export class SyncService {
   private readonly logger = new Logger(SyncService.name);
+
   constructor(
     private readonly cfg: ConfigService,
     private readonly products: ProductsService,
   ) {}
 
-  private http() {
+  private http(): AxiosInstance {
     const token = this.cfg.get<string>('CONTENTFUL_ACCESS_TOKEN');
     return axios.create({
       baseURL:
@@ -33,12 +37,10 @@ export class SyncService {
     locale = 'en-US',
   ): T | null {
     const v =
-      value &&
-      typeof value === 'object' &&
-      value !== null &&
-      locale in (value as Record<string, unknown>)
+      value && typeof value === 'object' && value !== null
         ? ((value as Record<string, unknown>)[locale] ?? value)
         : value;
+
     if (kind === 'number') {
       let n: number;
       if (typeof v === 'number') {
@@ -62,66 +64,91 @@ export class SyncService {
     return { contentfulId: e.sys?.id, name, category, price, currency };
   }
 
-  private async fetchPage(
-    client: ReturnType<SyncService['http']>,
-    skip: number,
-    limit = 100,
-  ): Promise<CdaList<Entry>> {
+  private buildUrl(skip: number, limit?: number): string {
     const s = this.cfg.get<string>('CONTENTFUL_SPACE_ID');
     const e = this.cfg.get<string>('CONTENTFUL_ENVIRONMENT');
     const c = this.cfg.get<string>('CONTENTFUL_CONTENT_TYPE') ?? 'product';
-    const url = `/spaces/${s}/environments/${e}/entries?content_type=${c}&skip=${skip}&limit=${limit}`;
+    const page = limit ?? Number(this.cfg.get('CONTENTFUL_PAGE_SIZE') ?? 100);
+    const select =
+      'fields.name,fields.category,fields.price,fields.currency,sys.id';
+    return `/spaces/${s}/environments/${e}/entries?content_type=${c}&skip=${skip}&limit=${page}&select=${encodeURIComponent(
+      select,
+    )}`;
+  }
+
+  private async delay(ms: number) {
+    await new Promise((r) => setTimeout(r, ms));
+  }
+
+  private async fetchPage(
+    client: AxiosInstance,
+    skip: number,
+    attempt = 0,
+  ): Promise<CdaList<Entry>> {
+    const url = this.buildUrl(skip);
 
     try {
       const { data } = await client.get<CdaList<Entry>>(url);
       return data;
     } catch (err) {
-      const e = err as AxiosError<any>;
+      const e = err as AxiosError<unknown>;
       const status = e.response?.status;
-      let msg: string;
-      if (
-        e.response &&
-        typeof (e.response.data as { message?: unknown })?.message === 'string'
-      ) {
-        msg = (e.response.data as { message: string }).message;
-      } else if (typeof e.message === 'string') {
-        msg = e.message;
-      } else {
-        msg = 'Unknown error';
+      const headers = (e.response?.headers ?? {}) as Record<string, string>;
+      const msg =
+        typeof e.response?.data === 'object' &&
+        e.response?.data !== null &&
+        'message' in e.response.data
+          ? (e.response.data as { message?: string }).message
+          : (e.message ?? 'Contentful request failed');
+
+      if (status === 429 && attempt < MAX_RETRIES) {
+        const retryAfter = Number(headers['retry-after']);
+        const reset = Number(headers['x-contentful-ratelimit-reset']);
+        let baseMs: number;
+        if (Number.isFinite(retryAfter)) {
+          baseMs = retryAfter * 1000;
+        } else if (Number.isFinite(reset)) {
+          baseMs = reset * 1000;
+        } else {
+          baseMs = 500 * 2 ** attempt;
+        }
+        const wait = Math.round(baseMs + Math.random() * JITTER_MS);
+
+        this.logger.warn(
+          `429 rate limit (attempt ${attempt + 1}/${MAX_RETRIES}), waiting ${wait}ms…`,
+        );
+        await this.delay(wait);
+        return this.fetchPage(client, skip, attempt + 1);
       }
+
       this.logger.error(`Contentful ${status ?? ''}: ${msg}`);
-      if (status === 429) {
-        await new Promise((r) => setTimeout(r, 1500));
-        return this.fetchPage(client, skip, limit);
-      }
       throw e;
     }
   }
 
   async refreshOnce() {
     const client = this.http();
-    let skip = 0,
-      total = 0,
-      imported = 0;
-    const limit = 100; // o 1000 para minimizar páginas
+    let skip = 0;
+    let total = 0;
+    let imported = 0;
+    const defaultPage = Number(this.cfg.get('CONTENTFUL_PAGE_SIZE') ?? 100);
 
     do {
-      const page = await this.fetchPage(client, skip, limit);
+      const page = await this.fetchPage(client, skip);
       total = page.total;
+
       for (const entry of page.items ?? []) {
         const m = this.mapEntry(entry);
         if (typeof m.contentfulId === 'string' && m.name) {
           await this.products.upsertFromContentful({
+            ...m,
             contentfulId: m.contentfulId,
-            name: m.name,
-            category: m.category,
-            price: m.price,
-            currency: m.currency,
           });
           imported++;
         }
       }
-      skip += page.limit ?? page.items?.length ?? 0;
+
+      skip += page.limit ?? page.items?.length ?? defaultPage;
     } while (skip < total);
 
     return { total, imported };

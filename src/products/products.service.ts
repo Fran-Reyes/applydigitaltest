@@ -59,7 +59,6 @@ export class ProductsService {
     return { affected: 1 };
   }
 
-  // Upsert usado por SyncService
   async upsertFromContentful(payload: {
     contentfulId: string;
     name: string;
@@ -71,13 +70,11 @@ export class ProductsService {
       where: { contentfulId: payload.contentfulId },
     });
     if (existing) {
-      // preserva soft-delete (no “resucita” items borrados)
       const updated = this.repo.merge(existing, {
         name: payload.name,
         category: payload.category ?? null,
         price: payload.price ?? null,
         currency: payload.currency ?? null,
-        // isDeleted: existing.isDeleted (implícito al merge si no se cambia)
       });
       return this.repo.save(updated);
     } else {
