@@ -28,6 +28,7 @@ A **NestJS + TypeORM (PostgreSQL)** API that:
 - [Tests, Lint & Coverage](#tests-lint--coverage)
 - [Conventional Commits](#conventional-commits)
 - [Troubleshooting](#troubleshooting)
+![CI](https://github.com/Fran-Reyes/applydigitaltest/actions/workflows/ci.yml/badge.svg)
 
 ---
 
