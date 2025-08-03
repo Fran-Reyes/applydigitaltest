@@ -14,27 +14,36 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthController = void 0;
 const common_1 = require("@nestjs/common");
-const auth_service_1 = require("./auth.service");
 const swagger_1 = require("@nestjs/swagger");
+const auth_service_1 = require("./auth.service");
+const login_dto_1 = require("./dto/login.dto");
 let AuthController = class AuthController {
     auth;
     constructor(auth) {
         this.auth = auth;
     }
-    async login(body) {
-        const ok = await this.auth.validate(body.username, body.password);
+    login(dto) {
+        const ok = this.auth.validate(dto.username, dto.password);
         if (!ok)
-            throw new Error('Invalid credentials');
-        return { access_token: String(this.auth.signToken(body.username)) };
+            throw new common_1.UnauthorizedException('Invalid credentials');
+        return { access_token: this.auth.signToken(dto.username) };
     }
 };
 exports.AuthController = AuthController;
 __decorate([
     (0, common_1.Post)('login'),
+    (0, common_1.HttpCode)(200),
+    (0, swagger_1.ApiBody)({ type: login_dto_1.LoginDto }),
+    (0, swagger_1.ApiOkResponse)({
+        schema: {
+            type: 'object',
+            properties: { access_token: { type: 'string' } },
+        },
+    }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
-    __metadata("design:returntype", Promise)
+    __metadata("design:paramtypes", [login_dto_1.LoginDto]),
+    __metadata("design:returntype", void 0)
 ], AuthController.prototype, "login", null);
 exports.AuthController = AuthController = __decorate([
     (0, swagger_1.ApiTags)('Auth'),

@@ -11,6 +11,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
   api:
     build: .
     depends_on:
@@ -32,4 +33,5 @@ services:
       AUTH_PASS: ${AUTH_PASS}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
+      SYNC_CRON: '${SYNC_CRON:0 * * * *}' # test in minutes "-0 * * * *"
     ports: ["3000:3000"]

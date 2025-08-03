@@ -1,6 +1,6 @@
 export declare class QueryProductsDto {
-    page?: number;
-    limit?: number;
+    page: number;
+    limit: number;
     name?: string;
     category?: string;
     minPrice?: string;

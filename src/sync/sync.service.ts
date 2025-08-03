@@ -154,9 +154,9 @@ export class SyncService {
     return { total, imported };
   }
 
-  @Cron(CronExpression.EVERY_HOUR)
+  @Cron(process.env.SYNC_CRON ?? CronExpression.EVERY_HOUR)
   async hourly() {
-    this.logger.log('Running hourly Contentful sync...');
+    this.logger.log('Running Contentful sync (cron)...');
     try {
       const res = await this.refreshOnce();
       this.logger.log(`Sync ok: imported=${res.imported}/${res.total}`);

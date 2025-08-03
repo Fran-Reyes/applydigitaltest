@@ -14,10 +14,10 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ProductsController = void 0;
 const common_1 = require("@nestjs/common");
+const swagger_1 = require("@nestjs/swagger");
 const products_service_1 = require("./products.service");
 const query_products_dto_1 = require("./dto/query-products.dto");
-const max_limit_pipe_1 = require("../common/pipes/max-limit.pipe");
-const swagger_1 = require("@nestjs/swagger");
+const product_response_1 = require("./dto/product.response");
 let ProductsController = class ProductsController {
     service;
     constructor(service) {
@@ -26,28 +26,66 @@ let ProductsController = class ProductsController {
     list(q) {
         return this.service.findAll(q);
     }
-    async remove(id) {
+    remove(id) {
         return this.service.softDelete(id);
     }
 };
 exports.ProductsController = ProductsController;
 __decorate([
+    (0, swagger_1.ApiQuery)({
+        name: 'page',
+        required: false,
+        type: Number,
+        description: 'Page >= 1',
+        example: 1,
+    }),
+    (0, swagger_1.ApiQuery)({
+        name: 'limit',
+        required: false,
+        type: Number,
+        description: 'Items per page (<= 5)',
+        example: 5,
+    }),
+    (0, swagger_1.ApiQuery)({ name: 'name', required: false, type: String }),
+    (0, swagger_1.ApiQuery)({ name: 'category', required: false, type: String }),
+    (0, swagger_1.ApiQuery)({ name: 'minPrice', required: false, type: Number }),
+    (0, swagger_1.ApiQuery)({ name: 'maxPrice', required: false, type: Number }),
+    (0, swagger_1.ApiQuery)({
+        name: 'sort',
+        required: false,
+        enum: ['name', 'price', 'createdAt'],
+    }),
     (0, common_1.Get)(),
-    (0, common_1.UsePipes)(new max_limit_pipe_1.MaxLimitPipe()),
+    (0, swagger_1.ApiOkResponse)({
+        description: 'Paged products',
+        schema: {
+            type: 'object',
+            properties: {
+                page: { type: 'number' },
+                limit: { type: 'number' },
+                total: { type: 'number' },
+                items: {
+                    type: 'array',
+                    items: { $ref: (0, swagger_1.getSchemaPath)(product_response_1.ProductResponseDto) },
+                },
+            },
+        },
+    }),
     __param(0, (0, common_1.Query)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [query_products_dto_1.QueryProductsDto]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:returntype", Promise)
 ], ProductsController.prototype, "list", null);
 __decorate([
     (0, common_1.Delete)(':id'),
-    __param(0, (0, common_1.Param)('id')),
+    __param(0, (0, common_1.Param)('id', new common_1.ParseUUIDPipe({ version: '4' }))),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
-    __metadata("design:returntype", Promise)
+    __metadata("design:returntype", void 0)
 ], ProductsController.prototype, "remove", null);
 exports.ProductsController = ProductsController = __decorate([
     (0, swagger_1.ApiTags)('Public: Products'),
+    (0, swagger_1.ApiExtraModels)(product_response_1.ProductResponseDto),
     (0, common_1.Controller)('products'),
     __metadata("design:paramtypes", [products_service_1.ProductsService])
 ], ProductsController);

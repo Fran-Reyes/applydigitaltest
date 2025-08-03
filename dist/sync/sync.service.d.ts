@@ -5,10 +5,14 @@ export declare class SyncService {
     private readonly products;
     private readonly logger;
     constructor(cfg: ConfigService, products: ProductsService);
-    private contentfulUrl;
+    private http;
     private pickLocalized;
     private mapEntry;
+    private buildUrl;
+    private delay;
+    private fetchPage;
     refreshOnce(): Promise<{
+        total: number;
         imported: number;
     }>;
     hourly(): Promise<void>;

@@ -28,7 +28,7 @@ let ProductsService = class ProductsService {
         if (name)
             where.name = (0, typeorm_2.ILike)(`%${name}%`);
         if (category)
-            where.category = category;
+            where.category = (0, typeorm_2.ILike)(category);
         if (minPrice && maxPrice)
             where.price = (0, typeorm_2.Between)(Number(minPrice), Number(maxPrice));
         else if (minPrice)
