@@ -1,6 +1,0 @@
-commitlint.config.cjs
-*.cjs
-node_modules
-dist
-coverage
-.husky

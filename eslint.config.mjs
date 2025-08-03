@@ -1,4 +1,4 @@
-// @ts-check
+
 import eslint from '@eslint/js';
 import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
 import globals from 'globals';
@@ -6,17 +6,26 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['eslint.config.mjs', 'dist/**', 'coverage/**'],
+    ignores: [
+      '**/*.cjs',
+      'commitlint.config.cjs',
+      'node_modules/**',
+      'dist/**',
+      'coverage/**',
+      '.husky/**',
+      '.github/**',
+      'docker/**',
+    ],
   },
+
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   eslintPluginPrettierRecommended,
+
   {
+    files: ['**/*.ts'],
     languageOptions: {
-      globals: {
-        ...globals.node,
-        ...globals.jest,
-      },
+      globals: { ...globals.node, ...globals.jest },
       sourceType: 'commonjs',
       parserOptions: {
         projectService: true,
@@ -24,6 +33,7 @@ export default tseslint.config(
       },
     },
   },
+
   {
     files: ['**/*.spec.ts', '**/*.test.ts'],
     rules: {
@@ -32,6 +42,7 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-member-access': 'off',
     },
   },
+
   {
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
