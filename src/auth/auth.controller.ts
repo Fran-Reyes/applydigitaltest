@@ -1,6 +1,13 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  Post,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { ApiBody, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { ApiTags } from '@nestjs/swagger';
+import { LoginDto } from './dto/login.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -8,11 +15,17 @@ export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Post('login')
-  login(@Body() body: { username: string; password: string }): {
-    access_token: string;
-  } {
-    const ok = this.auth.validate(body.username, body.password);
-    if (!ok) throw new Error('Invalid credentials');
-    return { access_token: String(this.auth.signToken(body.username)) };
+  @HttpCode(200)
+  @ApiBody({ type: LoginDto })
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: { access_token: { type: 'string' } },
+    },
+  })
+  login(@Body() dto: LoginDto) {
+    const ok = this.auth.validate(dto.username, dto.password);
+    if (!ok) throw new UnauthorizedException('Invalid credentials');
+    return { access_token: this.auth.signToken(dto.username) };
   }
 }

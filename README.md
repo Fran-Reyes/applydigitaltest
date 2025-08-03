@@ -1,98 +1,244 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Products API — Apply Digital Test
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A **NestJS + TypeORM (PostgreSQL)** API that:
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+- ✅ Exposes a **public products module** with pagination (max **5** per page) and filters
+- ✅ Implements **soft-delete** (items do **not** come back on sync)
+- ✅ Syncs products from **Contentful (CDA)** **hourly** and via a manual endpoint
+- ✅ Ships a **private reports module** protected with **JWT**
+- ✅ Swagger docs at `http://localhost:3000/api/docs`
+- ✅ Ready for **Docker Compose**, **tests**, and **conventional commits**
 
-## Description
+---
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Table of Contents
 
-## Project setup
+- [Architecture](#architecture)
+- [Requirements](#requirements)
+- [Environment (.env)](#environment-env)
+- [Run](#run)
+  - [With Docker (recommended)](#with-docker-recommended)
+  - [Local without Docker](#local-without-docker)
+- [Contentful Sync](#contentful-sync)
+- [Endpoints](#endpoints)
+  - [Auth (private)](#auth-private)
+  - [Products (public)](#products-public)
+  - [Reports (private)](#reports-private)
+- [Usage Examples](#usage-examples)
+- [Tests, Lint & Coverage](#tests-lint--coverage)
+- [Conventional Commits](#conventional-commits)
+- [Troubleshooting](#troubleshooting)
 
-```bash
-$ npm install
+---
+
+## Architecture
+
+```
+src/
+  auth/            # Login + JWT (@nestjs/jwt) and JwtGuard
+  products/        # Product entity + service/controller (public)
+  reports/         # Aggregations/metrics (private with JWT)
+  sync/            # Cron + manual endpoint to import from Contentful
+  common/pipes/    # MaxLimitPipe (enforces limit <= 5)
 ```
 
-## Compile and run the project
+- **SyncModule → ProductsService**: upsert by `contentfulId`, preserving `isDeleted=true`.
+- **Soft-delete**: `DELETE /products/:id` sets `isDeleted=true` and does **not** resurrect on sync.
+- **Swagger**: `/api/docs`.
 
-```bash
-# development
-$ npm run start
+---
 
-# watch mode
-$ npm run start:dev
+## Requirements
 
-# production mode
-$ npm run start:prod
+- **Node.js 20+** (or Docker)
+- **Docker Desktop** (Windows: WSL2 enabled)
+- **Git**
+- (Optional) `jq` for bash examples
+
+---
+
+## Environment (.env)
+
+Create an **`.env`** file in the project root:
+
+```ini
+# Postgres
+DB_HOST=db
+DB_PORT=5432
+DB_USER=postgres
+DB_PASS=postgres
+DB_NAME=products
+
+# Auth (demo)
+AUTH_USER=admin
+AUTH_PASS=admin
+JWT_SECRET=supersecret
+JWT_EXPIRES_IN=1h
+
+# Contentful (CDA)
+CONTENTFUL_SPACE_ID=xxxxxx
+CONTENTFUL_ACCESS_TOKEN=xxxxxx   # Delivery API token (NOT Preview/Management)
+CONTENTFUL_ENVIRONMENT=master
+CONTENTFUL_CONTENT_TYPE=product
+CONTENTFUL_PAGE_SIZE=1000
+# CONTENTFUL_USE_PREVIEW=false    # true to use Preview API
+
+# App
+PORT=3000
+NODE_ENV=development
 ```
 
-## Run tests
+> Use a **Content Delivery API** token. If you must use Preview, set `CONTENTFUL_USE_PREVIEW=true`.
+
+---
+
+## Run
+
+### With Docker (recommended)
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+docker compose up -d --build
+docker compose logs -f api
 ```
 
-## Deployment
+- API: `http://localhost:3000`
+- Swagger: `http://localhost:3000/api/docs`
+- DB: PostgreSQL on `localhost:5432` (see `.env`)
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### Local without Docker
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+npm ci
+npm run start:dev
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+You’ll need a local Postgres matching your `.env`.  
+*(For the test we use `synchronize: true`; use migrations for production.)*
 
-## Resources
+---
 
-Check out a few resources that may come in handy when working with NestJS:
+## Contentful Sync
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+- **Cron**: runs hourly.
+- **Manual**: `POST /sync/refresh`
 
-## Support
+```bash
+curl -X POST http://localhost:3000/sync/refresh
+# → { "total": <total>, "imported": <imported> }
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+Integration notes:
 
-## Stay in touch
+- Uses `Authorization: Bearer <token>` (not a query param).
+- Smart **rate-limit backoff** on `429` (`Retry-After` / `X-Contentful-RateLimit-Reset` + exponential jitter).
+- `CONTENTFUL_PAGE_SIZE` (default 100; recommended 1000).
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+---
+
+## Endpoints
+
+### Auth (private)
+
+- `POST /auth/login` → `{ access_token }`  
+  Body: `{ "username":"admin", "password":"admin" }` (configurable via `.env`).
+
+### Products (public)
+
+- `GET /products`
+  - **Query**: `page` (1), `limit` (≤ **5**), `name`, `category`, `minPrice`, `maxPrice`, `sort` (`name|price|createdAt`)
+- `DELETE /products/:id`
+  - Soft-delete (`isDeleted=true`)
+
+### Reports (private, `Authorization: Bearer <JWT>`)
+
+- `GET /reports/deleted-percentage`
+- `GET /reports/non-deleted-percentage?hasPrice=true|false&startDate=YYYY-MM-DD&endDate=YYYY-MM-DD`
+- `GET /reports/top-categories?limit=5`
+
+---
+
+## Usage Examples
+
+**1) Seed data from Contentful**
+```bash
+curl -X POST http://localhost:3000/sync/refresh
+```
+
+**2) Public products**
+```bash
+curl "http://localhost:3000/products?page=1&limit=5&name=shoe&minPrice=50&maxPrice=120&sort=price"
+```
+
+**3) Auth + private**
+
+- **PowerShell**
+  ```powershell
+  $TOKEN = (curl.exe -s -X POST http://localhost:3000/auth/login -H "Content-Type: application/json" `
+    -d "{\"username\":\"admin\",\"password\":\"admin\"}" | ConvertFrom-Json).access_token
+
+  curl.exe -H "Authorization: Bearer $TOKEN" http://localhost:3000/reports/deleted-percentage
+  ```
+
+- **Git Bash (without jq)**
+  ```bash
+  TOKEN=$(curl -s -X POST http://localhost:3000/auth/login \
+    -H 'Content-Type: application/json' \
+    -d '{"username":"admin","password":"admin"}' \
+  | sed -n 's/.*"access_token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+
+  curl -H "Authorization: Bearer $TOKEN" http://localhost:3000/reports/deleted-percentage
+  ```
+
+---
+
+## Tests, Lint & Coverage
+
+```bash
+npm run test        # unit tests
+npm run test:cov    # coverage (text + lcov + json-summary)
+npm run lint        # eslint + prettier
+npm run lint:fix
+```
+
+- Coverage target: **≥ 50%** (typical with included specs: ~50–70%).
+- Unit tests mock Contentful and Postgres.
+
+---
+
+## Conventional Commits
+
+**commitlint + husky** enforce conventional commits.
+
+- Valid example (≤100 chars, lower-case subject):
+  ```
+  feat(sync): page size config and smarter rate-limit backoff
+  ```
+- Common types: `feat`, `fix`, `chore`, `refactor`, `test`, `docs`.
+- If the hook fails (subject-case/length), amend:
+  ```bash
+  git commit --amend -m "feat(...): ..." && git push --force-with-lease
+  ```
+
+---
+
+## Troubleshooting
+
+**Docker/WSL2 on Windows**  
+Enable WSL2 and restart Docker Desktop.
+
+**`/sync/refresh` returns 401/404/429**  
+- **401**: wrong token → use **CDA** token (Delivery).  
+- **404**: wrong `SPACE_ID` / `ENVIRONMENT` / `CONTENT_TYPE`.  
+- **429**: rate-limit → backoff is built-in; avoid repeated manual refresh; tune `CONTENTFUL_PAGE_SIZE` (e.g., 500–1000).
+
+**JWT 401 on private endpoints**  
+Send `Authorization: Bearer <token>`. Default credentials: `admin/admin` (configurable).
+
+**Swagger not available**  
+Visit `http://localhost:3000/api/docs` and ensure the `api` container is running.
+
+---
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+MIT
