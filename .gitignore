@@ -1,0 +1,41 @@
+# env
+.env
+.env.* 
+!.env.example
+
+# deps & build
+node_modules/
+dist/
+
+# tests & coverage
+coverage/
+.nyc_output/
+jest-results.json
+junit.xml
+
+# logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# caches
+.cache/
+.tmp/
+.eslintcache
+.turbo/
+.vite/
+.parcel-cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# docker (si usas volúmenes locales)
+docker-data/
