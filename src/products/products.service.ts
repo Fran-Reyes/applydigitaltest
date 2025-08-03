@@ -10,17 +10,18 @@ import {
 } from 'typeorm';
 import { Product } from './product.entity';
 import { QueryProductsDto } from './dto/query-products.dto';
+import { Paginated } from 'src/common/types/paginated';
 @Injectable()
 export class ProductsService {
   constructor(
     @InjectRepository(Product) private readonly repo: Repository<Product>,
   ) {}
 
-  async findAll(q: QueryProductsDto) {
+  async findAll(q: QueryProductsDto): Promise<Paginated<Product>> {
     const { page = 1, limit = 5, name, category, minPrice, maxPrice, sort } = q;
     const where: FindOptionsWhere<Product> = { isDeleted: false };
     if (name) where.name = ILike(`%${name}%`);
-    if (category) where.category = category;
+    if (category) where.category = ILike(category);
     if (minPrice && maxPrice)
       where.price = Between(Number(minPrice), Number(maxPrice));
     else if (minPrice) where.price = MoreThanOrEqual(Number(minPrice));
