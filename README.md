@@ -1,4 +1,4 @@
-# Products API — Apply Digital Test
+# Products API — Code Challenge
 
 A **NestJS + TypeORM (PostgreSQL)** API that:
 
